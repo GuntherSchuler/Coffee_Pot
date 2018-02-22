@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<script src="funcs.js"> </script>
+<script src="houndify.js"></script>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    
+    body, div{
+        padding: 0;
+        margin: 0;
+    }
+    
+    .col {
+        float:left;
+        width: 75%;
+    }    
+    .col2 {
+        float:left;
+        width: 25%;
+    }    
+    
+    /*
+    */
+    button {
+        width: 50%;
+        padding-top: 25px;
+        padding-bottom: 25px;
+        float:left;
+        text-align:center;
+    }
+    .mic {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 4px;    
+        background-color:Black;
+        border: 2px solid white;
+        box-shadow: 3px 3px 1px grey;
+        padding: 5px;
+    }
+    .textBox {
+        float:left;
+        font-size: 16px;
+        padding:22px;
+        width:80%;
+        border:2px solid Black; 
+        border-radius:4px;
+    }
+    .micImg {
+        max-height: 50px;
+    }
+    
+    @media screen and (max-width: 600px)
+    {
+        .col  {width: 100%;}    
+        .col2 {width: 100%;}
+        .mic {
+            margin: 8% 2px;
+            width: 50px;
+            height: 50px;
+            padding: 10px;
+            border-radius:50%;  
+        }
+        .micImg {
+            max-height: 30px;
+        }
+    
+    }
+</style>
+
+<html>
+    <head>
+        <title>AudioCoffee powered by hound</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div class="col">
+            <div id="trans" class="textBox"; >Click Mic!</div>
+            <div style="width:20%;float:left;">
+                <button id="micButton" class="mic"><img class="micImg" src="mic.svg"></button>
+            </div>
+        </div>
+        <div class="col2">
+            <button id="onbutton">Toggle</button>
+            <button id="brewbutton">Start Brew</button>
+        </div>
+    </body>
+</html>
+
+<script>
+
+    var trans = document.getElementById("trans");
+    var recButton = document.getElementById("micButton");
+    //From houndify example included in sdk
+      var conversationState = null;
+      var recorder = new Houndify.AudioRecorder();
+      var voiceRequest = null;
+
+      function initVoiceRequest(sampleRate) {
+        var voiceRequest = new Houndify.VoiceRequest({
+          clientId:"wYtpbCAHASNqybxEwjqRBQ==",
+
+          //clientKey: "gGlDCq1UXYGQw5t4X1alLzDPNUFZmZleITsPHF785cqzyEK65FJNytb1pjZV_3yQBcpANqWF0ArAV1emLds5jw==",
+          authURL: "/houndAuth",
+
+          //REQUEST INFO JSON
+          //See https://houndify.com/reference/RequestInfo
+          //requestInfo: { 
+          //  UserID: "test_user",
+          //  Latitude: 37.388309, 
+          //  Longitude: -121.973968
+          //},
+
+          //Pass the current ConversationState stored from previous queries
+          //See https://www.houndify.com/docs#conversation-state
+          conversationState: conversationState,
+
+          //Sample rate of input audio
+          sampleRate: sampleRate,
+
+          //Enable Voice Activity Detection
+          //Default: true
+          enableVAD: true,
+          
+          //Partial transcript, response and error handlers
+          onTranscriptionUpdate: onTranscriptionUpdate,
+          onResponse: function(response, info) {
+            recorder.stop();
+            onResponse(response, info);
+          },
+          onError: function(err, info) {
+            recorder.stop();
+            onError(err, info);
+          }
+        });
+
+        return voiceRequest;
+      }
+      
+      function onTranscriptionUpdate(transcript) {
+        if(transcript.PartialTranscript != "")
+            trans.innerHTML = transcript.PartialTranscript;
+      }
+
+      function onResponse(response, info) {
+        if (response.AllResults && response.AllResults.length) {
+          //Pick and store appropriate ConversationState from the results. 
+          //This example takes the default one from the first result.
+          conversationState = response.AllResults[0].ConversationState;
+          //trans.innerHTML += "\n" + response.stringify(undefined, 2);
+          //console.log(info);
+            trans.innerHTML += "<br>Mr Coffee: " + response.AllResults[0].WrittenResponse;
+            console.log(response.AllResults[0].Result);
+            if(response.AllResults[0].action == "brew");
+                brew(response.AllResults[0].Result.number);
+        }
+        
+      }
+      
+    function onError(err, info) {
+        console.log("Error " + err);
+        console.log("Info " + info);
+      }
+      
+      recorder.on('start', function() {  
+        trans.innerHTML = "Speak!";
+        recButton.style.backgroundColor = "DodgerBlue";
+        voiceRequest = initVoiceRequest(recorder.sampleRate);
+      });
+
+      recorder.on('data', function(data) {
+        voiceRequest.write(data);
+      });
+
+      recorder.on('end', function() {
+        voiceRequest.end();
+        recButton.style.backgroundColor = "Black";
+      });
+
+      recorder.on('error', function(error) {
+        recButton.style.backgroundColor = "Black";
+        console.log("At recorder error");
+        if (voiceRequest)
+            voiceRequest.abort();
+        console.log("Error: " + error);
+        trans.innerHTML = "Error! " + error;
+      });
+
+  function micClick() {
+    console.log("Clicked record");
+    if (recorder && recorder.isRecording()) {
+      recorder.stop();
+      return;
+    }
+    recorder.start();
+  }
+
+    //Set up listeners
+    document.onload = update();
+    document.getElementById("onbutton").addEventListener("click", () => {
+        turnon();
+    }, false);
+    document.getElementById("brewbutton").addEventListener("click", () => {
+        brew(6);
+    }, false);
+    document.getElementById("micButton").addEventListener("click", () => {
+        micClick();
+    }, false);
+</script>
+
